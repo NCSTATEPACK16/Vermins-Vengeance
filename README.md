@@ -2,25 +2,52 @@
 
 > ⚠️ **Working title.** "Rodent's Revenge" is the name of the 1991 Microsoft
 > Entertainment Pack puzzle game this project is inspired by. The repo will be
-> **renamed before any public release** and shipped under an original name. Until
-> then, consider keeping this repository **private** (see [Naming & IP](#naming--ip)).
+> **renamed before any public release** and shipped under an original name
+> (see [Naming & IP](#naming--ip)).
 
-A modern, cross-platform remake of the classic grid puzzle game where a mouse
-pushes blocks to trap pursuing cats and turn them into cheese. Built web-first,
-with an iOS app planned via Capacitor.
+A modern, web-first remake of the classic grid puzzle: you're a mouse on a 20×20
+board, pushing block chains to trap pursuing cats and turn them into cheese for
+points, surviving as the cats speed up each level. An iOS build is planned.
 
-**Project status:** 🟡 Planning / pre-code. The design and architecture are
-documented; implementation has not started yet.
+**Project status:** 🟢 Playable prototype, active development. The web app is a
+complete, runnable game; work now focuses on hardening it (tests) and layering in
+the modern mechanics described in [`docs/`](docs/).
 
 ---
 
 ## The Game in One Paragraph
 
-You're a mouse on a grid. Cats chase you. You push blocks to wall them in — once a
-cat is fully enclosed with no path to open space, it's trapped and becomes cheese
-you can eat for points. Clear all the cats to advance. The modern version layers
-on new block types, power-ups, hazards, and time-warping tiles while keeping the
-original push-block feel intact.
+Move orthogonally on a 20×20 grid. Push connected lines of blocks to wall the
+cats in — once a cat is fully enclosed (or squeezed against a wall), it's trapped
+and becomes cheese you can eat for **+100** each. Clear all cats and cheese to
+advance; each level the cats tick faster. If a cat reaches your cell, it's game
+over. Best level cleared is saved locally.
+
+---
+
+## Current Tech Stack
+
+| Layer | Current implementation |
+| :--- | :--- |
+| Language | TypeScript |
+| UI framework | React 19 |
+| Build tool | Vite 8 |
+| Styling | Tailwind CSS v4 (`@tailwindcss/vite`) |
+| Icons | lucide-react |
+| Rendering | CSS grid (`GameBoard.tsx`) |
+| Game loop | `setInterval` driving cat ticks |
+| State | React `useState` + immutable snapshots |
+| Persistence | `localStorage` (best level cleared) |
+| Tests | Vitest (engine unit tests) |
+
+The architecture keeps a **pure engine as the single source of truth**:
+`src/game/` is framework-agnostic TypeScript, and the React layer is a thin view
+over immutable `GameSnapshot` values.
+
+> **Planned upgrades** (see [`docs/technical-spec.md`](docs/technical-spec.md)):
+> swap the CSS grid for a 2D canvas, replace `setInterval` with a
+> `requestAnimationFrame` + delta-time loop for 60fps, and bridge to iOS via
+> Capacitor. These are *not* in place yet.
 
 ---
 
@@ -28,89 +55,75 @@ original push-block feel intact.
 
 ```
 .
-├── README.md                  ← you are here
-├── .gitignore
-└── docs/
-    ├── modernization-plan.md  ← full architectural blueprint (the "why")
-    └── technical-spec.md      ← condensed implementation spec (the "what")
+├── README.md
+├── LICENSE
+├── HANDOFF.md                 Agent/dev hand-off notes
+├── HOW_TO_PLAY.txt            Player-facing instructions
+├── index.html                 Vite shell
+├── package.json
+├── vite.config.ts
+├── vitest.config.ts           Test runner config
+├── docs/
+│   ├── modernization-plan.md  Full architectural blueprint (the "why")
+│   └── technical-spec.md      Condensed implementation spec (the "what")
+├── public/                    Static assets (favicon.svg, icons.svg)
+└── src/
+    ├── main.tsx               React entry
+    ├── App.tsx                HUD, cat timer, input, help, continue/restart
+    ├── index.css              Tailwind import + base layout
+    ├── components/
+    │   └── GameBoard.tsx      20×20 grid + touch swipe handling
+    └── game/                  Pure engine (source of truth)
+        ├── rodentEngine.ts    moveMouse, stepCats, checkTrapped, level build
+        ├── types.ts           Tile, Direction, GameSnapshot, GRID_SIZE
+        ├── catSpeed.ts        Per-level cat tick interval
+        └── highScoreLevels.ts localStorage best-level helper
 ```
-
-Planned structure once implementation begins (from the spec):
-
-```
-src/
-├── engine/        Pure TypeScript — Grid, AI, physics, BFS. No framework deps.
-├── hooks/         React hooks — useGameLoop, useInput.
-├── components/    React + Tailwind presentation layer.
-└── store/         Global state (Zustand or Redux) — scores, settings.
-ios/               Capacitor-generated Xcode project.
-```
-
----
-
-## Tech Stack
-
-| Layer | Choice |
-| :--- | :--- |
-| Language | TypeScript |
-| UI | React |
-| Styling | Tailwind CSS |
-| Rendering | 2D Canvas (grid/entities) + React (UI overlays) |
-| Native bridge | Capacitor (iOS) |
-| State | Zustand or Redux (TBD) |
-
-The guiding architectural principle: **the engine is the single source of truth**
-for game state; React is just a view that reflects it. Game logic lives in
-`/src/engine` as pure, unit-testable TypeScript with zero framework dependencies.
-
----
-
-## Documentation
-
-- **[`docs/modernization-plan.md`](docs/modernization-plan.md)** — The long-form
-  blueprint: AI pathfinding, enclosure detection, the five proposed modern
-  mechanics, performance strategy, and the full reasoning behind each decision.
-- **[`docs/technical-spec.md`](docs/technical-spec.md)** — The condensed spec,
-  written to be handed directly to a developer or used as an implementation prompt.
-
----
-
-## Roadmap
-
-1. **Engine-first.** Build and unit-test `GameGrid` and `CatAI` in isolation —
-   prove the flood-fill enclosure logic is correct before any rendering exists.
-2. **Input abstraction.** Unified `InputManager` mapping keyboard, virtual D-pad,
-   and swipe to one command set.
-3. **Rendering + loop.** 2D canvas grid + `useGameLoop` (rAF + delta time).
-4. **Modern mechanics.** Layer in elemental/degradable blocks, power-ups, hazards.
-5. **iOS build.** Wire up Capacitor; test on simulator and device early.
-6. **Polish.** Audio, haptics, transitions; performance profiling for 60 fps.
 
 ---
 
 ## Getting Started
 
-> Implementation hasn't started yet, so there's nothing to run. Once the engine
-> and a Vite/React scaffold land, this section will cover `npm install`, dev
-> server, and the iOS build steps. Tracked as a roadmap item.
+```bash
+npm install
+npm run dev       # Vite dev server (typically http://localhost:5173)
+npm run build     # tsc -b && vite build  -> dist/
+npm run preview   # serve the production build
+npm run lint      # ESLint
+npm test          # run the Vitest engine suite
+npm run test:watch
+```
+
+No environment variables, backend, or API keys required.
+
+---
+
+## Roadmap (development "loops")
+
+1. **Foundation** — test harness + engine unit tests, LICENSE, docs cleanup.
+2. **Tile metadata + first mechanics** — degradable blocks, Super Mouse power-up.
+3. **Elemental blocks & hazards** — ice/magnet blocks, sink holes, yarn balls.
+4. **Rendering/perf** — 2D canvas + rAF delta-time loop, Safari optimizations.
+5. **Audio/haptics/polish** — SFX, transitions, accessibility.
+6. **iOS** — Capacitor bridge (or the sibling Swift engine port).
+7. **Rename & release** — original name/art/audio, deploy, App Store.
+
+See [`docs/modernization-plan.md`](docs/modernization-plan.md) for the full
+reasoning and the proposed modern mechanics.
 
 ---
 
 ## Naming & IP
 
 This project recreates a Microsoft-published game and currently uses its
-trademarked name as a working title. Before going public:
-
-- Pick an **original name** and rename the repo, the Capacitor `appId`/`appName`,
-  and all in-game references.
-- Use **original art and audio** rather than assets from the 1991 game.
-- Decide on a **license** (none chosen yet — without one, the code is "all rights
-  reserved" by default).
-
-Keeping the repo private until the rename is the lowest-risk path.
+trademarked name as a working title. Before going public: pick an **original
+name** (rename the repo, the future Capacitor `appId`/`appName`, and in-game
+text) and use **original art and audio**. Keeping the repo private until the
+rename is the lowest-risk path.
 
 ---
 
 ## License
 
-No license has been selected yet. See [Naming & IP](#naming--ip).
+[MIT](LICENSE). Update the copyright line in `LICENSE` to your legal name before
+release.
