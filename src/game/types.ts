@@ -1,4 +1,4 @@
-export type Tile = 'empty' | 'wall' | 'block' | 'cheese'
+export type Tile = 'empty' | 'wall' | 'block' | 'cracked' | 'cheese' | 'powerup'
 
 export type Direction = 'up' | 'down' | 'left' | 'right'
 
@@ -15,4 +15,6 @@ export type GameSnapshot = {
   status: GameStatus
   level: number
   score: number
+  /** Remaining moves of Super Mouse power-up. 0 = inactive. */
+  superMouseTurns: number
 }

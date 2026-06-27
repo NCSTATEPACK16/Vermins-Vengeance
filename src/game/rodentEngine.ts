@@ -10,6 +10,9 @@ const W = GRID_SIZE
 const H = GRID_SIZE
 const CHEESE_POINTS = 100
 
+/** Moves of Super Mouse granted by picking up a powerup tile. */
+export const SUPER_MOUSE_TURNS = 10
+
 export function dirDelta(dir: Direction): Vec {
   switch (dir) {
     case 'up':
@@ -90,6 +93,11 @@ function buildLevel(level: number, score: number): GameSnapshot {
   ]
   for (const b of blocks) grid[b.y][b.x] = 'block'
 
+  // Loop 2: seed a cracked block and a powerup tile for demonstration.
+  // Full level-design integration comes in a later loop.
+  grid[3][10] = 'cracked'
+  grid[6][10] = 'powerup'
+
   const mouse: Vec = { x: 10, y: 10 }
   const catSpawns: Vec[] = [
     { x: 10, y: 5 },
@@ -103,7 +111,7 @@ function buildLevel(level: number, score: number): GameSnapshot {
   const catCount = Math.min(2 + level, catSpawns.length)
   const cats = catSpawns.slice(0, catCount)
 
-  return { grid, mouse, cats, status: 'playing', level, score }
+  return { grid, mouse, cats, status: 'playing', level, score, superMouseTurns: 0 }
 }
 
 /** Border walls; inner blocks + actors placed for a playable prototype. */
@@ -119,15 +127,19 @@ function catAt(cats: Vec[], x: number, y: number): boolean {
   return cats.some((c) => c.x === x && c.y === y)
 }
 
+/**
+ * Tiles that block cat movement.
+ * 'cracked' acts as a physical obstacle for cats (they cannot smash through it).
+ */
 function tileBlocksCatMove(t: Tile): boolean {
-  return t === 'wall' || t === 'block'
+  return t === 'wall' || t === 'block' || t === 'cracked'
 }
 
 function canMouseEnterTile(t: Tile): boolean {
-  return t === 'empty' || t === 'cheese'
+  return t === 'empty' || t === 'cheese' || t === 'powerup'
 }
 
-/** Push destination must be strictly empty (not cheese). */
+/** Push destination must be strictly empty (not cheese, not cracked, not powerup). */
 function canPushOnto(t: Tile): boolean {
   return t === 'empty'
 }
@@ -136,7 +148,6 @@ function isOutOfBounds(x: number, y: number): boolean {
   return x < 0 || x >= W || y < 0 || y >= H
 }
 
-/** Cell the train can slide into (cat will occupy; not stored on grid). */
 function canSlideCatOnto(
   grid: Tile[][],
   cats: Vec[],
@@ -150,8 +161,8 @@ function canSlideCatOnto(
 }
 
 /**
- * A side is “closed” for trapping only if it is out of bounds or `wall`/`block`.
- * Mouse, another cat, empty, or cheese leaves that side open.
+ * A side is "closed" for trapping only if it is out of bounds, wall, block, or cracked.
+ * Mouse, another cat, empty, cheese, or powerup leaves that side open.
  */
 function isSideClosedForTrap(
   grid: Tile[][],
@@ -166,7 +177,12 @@ function isSideClosedForTrap(
   if (cats.some((c) => c.x === nx && c.y === ny && !(c.x === self.x && c.y === self.y)))
     return false
   const t = grid[ny][nx]
-  return t === 'wall' || t === 'block'
+  return t === 'wall' || t === 'block' || t === 'cracked'
+}
+
+/** True if the tile counts as a block-like obstacle (block or cracked). */
+function isBlockLike(t: Tile): boolean {
+  return t === 'block' || t === 'cracked'
 }
 
 export function checkTrapped(snapshot: GameSnapshot): GameSnapshot {
@@ -179,15 +195,17 @@ export function checkTrapped(snapshot: GameSnapshot): GameSnapshot {
   for (const cat of snapshot.cats) {
     const northClosed = isSideClosedForTrap(grid, mouse, snapshot.cats, cat, cat.x, cat.y - 1)
     const southClosed = isSideClosedForTrap(grid, mouse, snapshot.cats, cat, cat.x, cat.y + 1)
-    const westClosed = isSideClosedForTrap(grid, mouse, snapshot.cats, cat, cat.x - 1, cat.y)
-    const eastClosed = isSideClosedForTrap(grid, mouse, snapshot.cats, cat, cat.x + 1, cat.y)
+    const westClosed  = isSideClosedForTrap(grid, mouse, snapshot.cats, cat, cat.x - 1, cat.y)
+    const eastClosed  = isSideClosedForTrap(grid, mouse, snapshot.cats, cat, cat.x + 1, cat.y)
 
     const trappedByAllSides = northClosed && southClosed && westClosed && eastClosed
+
+    // Wall + any block-like tile on the same axis triggers the squeeze trap.
     const trappedByWallAndBlock =
-      ((grid[cat.y][cat.x - 1] === 'wall' && grid[cat.y][cat.x + 1] === 'block') ||
-        (grid[cat.y][cat.x - 1] === 'block' && grid[cat.y][cat.x + 1] === 'wall') ||
-        (grid[cat.y - 1][cat.x] === 'wall' && grid[cat.y + 1][cat.x] === 'block') ||
-        (grid[cat.y - 1][cat.x] === 'block' && grid[cat.y + 1][cat.x] === 'wall'))
+      (grid[cat.y][cat.x - 1] === 'wall' && isBlockLike(grid[cat.y][cat.x + 1])) ||
+      (isBlockLike(grid[cat.y][cat.x - 1]) && grid[cat.y][cat.x + 1] === 'wall') ||
+      (grid[cat.y - 1][cat.x] === 'wall' && isBlockLike(grid[cat.y + 1][cat.x])) ||
+      (isBlockLike(grid[cat.y - 1][cat.x]) && grid[cat.y + 1][cat.x] === 'wall')
 
     if (trappedByAllSides || trappedByWallAndBlock) {
       grid[cat.y][cat.x] = 'cheese'
@@ -220,22 +238,31 @@ export function moveMouse(snapshot: GameSnapshot, dir: Direction): GameSnapshot 
 
   if (catAt(cats, mx, my)) return snapshot
 
-  if (tileBlocksCatMove(targetTile) && targetTile !== 'block') return snapshot
-
   let mouse: Vec
   let score = snapshot.score
-  if (targetTile === 'block') {
-    // Cats live off-grid: collect consecutive blocks, then consecutive cats along `d`.
+  let superMouseTurns = snapshot.superMouseTurns
+
+  if (targetTile === 'cracked') {
+    // Cracked block: shatter in place, mouse moves through.
+    // Cannot be pushed — the mouse simply walks into it and it breaks.
+    grid[my][mx] = 'empty'
+    mouse = { x: mx, y: my }
+
+  } else if (targetTile === 'wall' && superMouseTurns > 0) {
+    // Super Mouse: smash through a wall tile (wall is destroyed, mouse moves there).
+    grid[my][mx] = 'empty'
+    mouse = { x: mx, y: my }
+
+  } else if (tileBlocksCatMove(targetTile) && targetTile !== 'block') {
+    // Normal wall (or cracked without super — already handled above): blocked.
+    return snapshot
+
+  } else if (targetTile === 'block') {
+    // ── Block push logic (unchanged from Loop 1) ──────────────────────────
     const blockCells: Vec[] = []
     let cx = mx
     let cy = my
-    while (
-      cx >= 0 &&
-      cx < W &&
-      cy >= 0 &&
-      cy < H &&
-      grid[cy][cx] === 'block'
-    ) {
+    while (cx >= 0 && cx < W && cy >= 0 && cy < H && grid[cy][cx] === 'block') {
       blockCells.push({ x: cx, y: cy })
       cx += d.x
       cy += d.y
@@ -310,15 +337,24 @@ export function moveMouse(snapshot: GameSnapshot, dir: Direction): GameSnapshot 
       }
     }
     mouse = { x: mx, y: my }
+
   } else if (canMouseEnterTile(targetTile)) {
+    // ── Normal tile entry: empty, cheese, or powerup ──────────────────────
     mouse = { x: mx, y: my }
     if (targetTile === 'cheese') {
       score += CHEESE_POINTS
       grid[my][mx] = 'empty'
+    } else if (targetTile === 'powerup') {
+      grid[my][mx] = 'empty'
+      superMouseTurns = SUPER_MOUSE_TURNS
     }
+
   } else {
     return snapshot
   }
+
+  // Every successful move consumes one Super Mouse turn (floor at 0).
+  const nextSuperMouseTurns = Math.max(0, superMouseTurns - 1)
 
   let next: GameSnapshot = {
     ...snapshot,
@@ -326,6 +362,7 @@ export function moveMouse(snapshot: GameSnapshot, dir: Direction): GameSnapshot 
     mouse,
     cats,
     score,
+    superMouseTurns: nextSuperMouseTurns,
     status: 'playing',
   }
   next = checkTrapped(next)
