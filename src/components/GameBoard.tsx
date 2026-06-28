@@ -5,67 +5,81 @@ import type { GameSnapshot, Tile } from '../game/types'
 type GameBoardProps = {
   snapshot: GameSnapshot
   onSwipe?: (dir: 'up' | 'down' | 'left' | 'right') => void
-  /** Extra props for the outer surface; `onTouchStart` / `onTouchEnd` are merged with swipe handling. */
+  skin?: 'modern' | 'arcade'
   surfaceProps?: HTMLAttributes<HTMLDivElement>
 }
 
 const SWIPE_THRESHOLD_PX = 30
 
-/** Spring used for actor (mouse/cat) movement — smooth glide, not a snap. */
 const moveSpring = { type: 'spring', stiffness: 360, damping: 30, mass: 0.9 } as const
 
-const tileBase =
-  'border border-slate-800/60 min-h-0 min-w-0 aspect-square'
-
-function tileBackground(tile: Tile): string {
+function tileClass(tile: Tile): string {
+  const base = 'min-h-0 min-w-0 aspect-square flex items-center justify-center'
   switch (tile) {
     case 'wall':
-      return 'bg-slate-800'
+      return `${base} bg-wall shadow-tile-wall`
     case 'block':
-      return 'bg-zinc-600 shadow-inner'
+      return `${base} rounded-tile bg-gradient-to-b from-block-top to-block-bottom shadow-tile-block`
     case 'cracked':
-      return 'bg-zinc-700/70 [background-image:repeating-linear-gradient(45deg,transparent,transparent_3px,rgba(0,0,0,0.35)_3px,rgba(0,0,0,0.35)_4px)]'
-    case 'powerup':
-      return 'bg-indigo-950/50'
+      return `${base} relative rounded-tile bg-gradient-to-b from-block-top to-block-bottom opacity-60 shadow-tile-block overflow-hidden`
+    case 'empty':
+      return `${base} bg-floor ring-1 ring-white/[.02]`
     case 'cheese':
-      return 'bg-emerald-950/45'
+      return `${base} z-10 rounded-tile bg-gold shadow-tile-cheese`
+    case 'powerup':
+      return `${base} rounded-tile bg-cyan/15`
     default:
-      return 'bg-slate-900'
+      return base
   }
 }
 
-export function GameBoard({ snapshot, onSwipe, surfaceProps }: GameBoardProps) {
+function tileInnerGlyph(tile: Tile): ReactNode {
+  switch (tile) {
+    case 'cheese':
+      return (
+        <div
+          className="h-[56%] w-[56%] bg-base/45 [clip-path:polygon(0_100%,100%_100%,100%_0)]"
+          aria-hidden
+        />
+      )
+    case 'cracked':
+      return (
+        <div
+          className="absolute inset-0 [background-image:repeating-linear-gradient(45deg,transparent,transparent_2px,rgba(0,0,0,0.4)_2px,rgba(0,0,0,0.4)_3px)]"
+          aria-hidden
+        />
+      )
+    case 'powerup':
+      return (
+        <div
+          className="h-[46%] w-[46%] animate-vv-pulse rounded-full bg-cyan shadow-[0_0_10px_rgba(33,230,255,.6)]"
+          aria-hidden
+        />
+      )
+    default:
+      return null
+  }
+}
+
+export function GameBoard({ snapshot, onSwipe, skin = 'modern', surfaceProps }: GameBoardProps) {
   const { grid, mouse, cats } = snapshot
   const touchOrigin = useRef<{ x: number; y: number } | null>(null)
 
   const rows = grid.length
   const cols = grid[0]?.length ?? 0
 
-  // Static background layer: walls, blocks, cracked, cheese, powerups.
   const cells: ReactNode[] = []
   for (let y = 0; y < rows; y++) {
     for (let x = 0; x < cols; x++) {
       const tile = grid[y][x]
       cells.push(
-        <div key={`${x}-${y}`} className={`relative ${tileBase} ${tileBackground(tile)}`}>
-          {tile === 'cheese' && (
-            <span
-              className="absolute left-1/2 top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-sm bg-emerald-400/90 opacity-90"
-              aria-hidden
-            />
-          )}
-          {tile === 'powerup' && (
-            <span
-              className="absolute left-1/2 top-1/2 h-2/5 w-2/5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-indigo-400 shadow-[0_0_10px_rgba(129,140,248,0.7)]"
-              aria-hidden
-            />
-          )}
+        <div key={`${x}-${y}`} className={tileClass(tile)}>
+          {tileInnerGlyph(tile)}
         </div>,
       )
     }
   }
 
-  // Position/size helpers (percent of board) for the animated actor overlay.
   const sizeStyle = { width: `${100 / cols}%`, height: `${100 / rows}%` }
   const posStyle = (x: number, y: number) => ({
     left: `${(x / cols) * 100}%`,
@@ -73,6 +87,11 @@ export function GameBoard({ snapshot, onSwipe, surfaceProps }: GameBoardProps) {
   })
 
   const superMouse = snapshot.superMouseTurns > 0
+
+  const chrome =
+    skin === 'arcade'
+      ? 'rounded-[10px] bg-[#070510] p-[3px] shadow-[0_0_0_1px_rgba(255,46,151,.25),0_0_34px_-8px_rgba(33,230,255,.5)]'
+      : 'rounded-3xl bg-white/[.03] p-2 ring-1 ring-white/[.07] shadow-[0_0_40px_-12px_rgba(33,230,255,.5),inset_0_0_30px_rgba(0,0,0,.4)]'
 
   return (
     <div
@@ -89,8 +108,7 @@ export function GameBoard({ snapshot, onSwipe, surfaceProps }: GameBoardProps) {
         const dx = t.clientX - touchOrigin.current.x
         const dy = t.clientY - touchOrigin.current.y
         touchOrigin.current = null
-        if (Math.abs(dx) < SWIPE_THRESHOLD_PX && Math.abs(dy) < SWIPE_THRESHOLD_PX)
-          return
+        if (Math.abs(dx) < SWIPE_THRESHOLD_PX && Math.abs(dy) < SWIPE_THRESHOLD_PX) return
         if (Math.abs(dx) >= Math.abs(dy)) {
           onSwipe(dx > 0 ? 'right' : 'left')
         } else {
@@ -98,18 +116,12 @@ export function GameBoard({ snapshot, onSwipe, surfaceProps }: GameBoardProps) {
         }
       }}
       className={[
-        'select-none touch-manipulation rounded-xl overflow-hidden shadow-[0_0_40px_-8px_rgba(251,191,36,0.15)] ring-1 ring-slate-700/80',
+        `select-none touch-manipulation overflow-hidden ${chrome}`,
         surfaceProps?.className ?? '',
       ].join(' ')}
     >
-      <div className="relative h-full w-full bg-slate-950">
-        <div
-          className="grid h-full w-full"
-          style={{
-            gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
-            gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))`,
-          }}
-        >
+      <div className="relative h-full w-full bg-base">
+        <div className="grid grid-cols-board grid-rows-board h-full w-full gap-px">
           {cells}
         </div>
 
@@ -122,24 +134,21 @@ export function GameBoard({ snapshot, onSwipe, surfaceProps }: GameBoardProps) {
             transition={moveSpring}
             aria-hidden
           >
-            <motion.span
-              className={`h-[62%] w-[62%] rounded-full bg-amber-400 [transform:translateZ(0)] will-change-transform ${
-                superMouse
-                  ? 'shadow-[0_0_18px_rgba(129,140,248,0.9)] ring-2 ring-indigo-300'
-                  : 'shadow-[0_0_12px_rgba(251,191,36,0.7)]'
-              }`}
+            <motion.div
+              className={[
+                'relative flex h-[62%] w-[62%] items-center justify-center rounded-[30%] bg-cyan shadow-tile-mouse [transform:translateZ(0)] will-change-transform',
+                superMouse ? 'ring-2 ring-gold' : '',
+              ].join(' ')}
               animate={superMouse ? { scale: [1, 1.12, 1] } : { scale: 1 }}
               transition={superMouse ? { duration: 0.8, repeat: Infinity } : { duration: 0.2 }}
-            />
+            >
+              <div className="h-[46%] w-[46%] rounded-full bg-base/60" />
+            </motion.div>
           </motion.div>
 
           <AnimatePresence>
             {cats.map((c, i) => (
               <motion.div
-                // Stable per-cat id (assigned at level build, preserved across
-                // moves/ticks/traps) so each cat animates continuously and a
-                // trapped cat plays the correct exit. Falls back to index only
-                // for engine-test snapshots that omit ids.
                 key={`cat-${c.id ?? i}`}
                 className="absolute flex items-center justify-center"
                 style={sizeStyle}
@@ -149,12 +158,27 @@ export function GameBoard({ snapshot, onSwipe, surfaceProps }: GameBoardProps) {
                 transition={moveSpring}
                 aria-hidden
               >
-                <span className="h-[62%] w-[62%] rounded-sm bg-rose-500 shadow-[0_0_12px_rgba(244,63,94,0.55)] [transform:translateZ(0)] will-change-transform" />
+                <div className="relative flex h-[62%] w-[62%] items-center justify-center rounded-sm bg-magenta shadow-tile-cat [transform:translateZ(0)] will-change-transform">
+                  <div className="h-[46%] w-[60%] bg-base/50 [clip-path:polygon(0_100%,16%_0,40%_52%,60%_52%,84%_0,100%_100%)]" />
+                </div>
               </motion.div>
             ))}
           </AnimatePresence>
         </div>
       </div>
     </div>
+  )
+}
+
+/** Decorative mouse icon used in logos and the lives row. */
+export function MouseGlyph({ size = 16, dim = false }: { size?: number; dim?: boolean }) {
+  const fill = dim ? 'bg-cyan/20' : 'bg-cyan shadow-[0_0_8px_rgba(33,230,255,.6)]'
+  const ear = `absolute -top-[3px] w-[40%] aspect-square rounded-full ${dim ? 'bg-cyan/20' : 'bg-cyan'}`
+  return (
+    <span className="relative inline-block" style={{ width: size, height: size }}>
+      <span className={`block h-full w-full rounded-[30%] ${fill}`} />
+      <span className={`${ear} left-[-12%]`} />
+      <span className={`${ear} right-[-12%]`} />
+    </span>
   )
 }

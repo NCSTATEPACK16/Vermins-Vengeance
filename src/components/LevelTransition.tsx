@@ -10,7 +10,7 @@ type LevelTransitionProps = {
 export function LevelTransition({ level, score, onContinue }: LevelTransitionProps) {
   return (
     <motion.div
-      className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-5 rounded-xl bg-slate-950/80 backdrop-blur-sm"
+      className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-5 rounded-3xl bg-base/80 backdrop-blur-sm font-display"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
@@ -22,19 +22,18 @@ export function LevelTransition({ level, score, onContinue }: LevelTransitionPro
         animate={{ scale: 1, y: 0 }}
         transition={{ type: 'spring', stiffness: 320, damping: 20 }}
       >
-        <p className="font-mono text-sm uppercase tracking-widest text-emerald-400/80">
-          Level cleared
+        <p className="font-mono text-[11px] uppercase tracking-[.3em] text-cyan-soft">
+          Level Cleared
         </p>
-        <p className="font-mono text-3xl font-bold text-emerald-200">Level {level}</p>
-        <p className="font-mono text-sm tabular-nums text-slate-300">{score} points</p>
+        <p className="font-mono text-3xl font-bold text-ink">Level {level}</p>
+        <p className="font-mono text-sm tabular-nums text-muted">{score.toLocaleString()} pts</p>
       </motion.div>
 
       <motion.button
         type="button"
         onClick={onContinue}
-        whileHover={{ scale: 1.04 }}
         whileTap={{ scale: 0.96 }}
-        className="rounded-lg border border-emerald-500/50 bg-emerald-950/50 px-6 py-2.5 font-mono text-sm font-semibold text-emerald-200 transition hover:border-emerald-400/80 hover:bg-emerald-900/60"
+        className="rounded-pill border border-cyan/50 bg-cyan/[.12] px-6 py-[13px] font-semibold text-cyan-soft shadow-glow-cy-soft transition active:scale-95"
       >
         Continue to level {level + 1}
       </motion.button>

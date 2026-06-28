@@ -1,0 +1,86 @@
+/* ============================================================
+   Vermin's Vengeance — Design Tokens
+   Tailwind CSS v4 (CSS-first @theme). Import once at app root:
+     @import "tailwindcss";
+     @import "./tokens.css";
+   Every token below becomes a utility, e.g.
+     --color-magenta  -> bg-magenta / text-magenta / border-magenta
+     --shadow-glow-mg -> shadow-glow-mg
+   ============================================================ */
+
+@theme {
+  /* ---- Fonts ---- */
+  --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-mono:    "Space Mono", ui-monospace, "SFMono-Regular", monospace;
+
+  /* ---- Surfaces (near-black, faintly purple) ---- */
+  --color-base:        #0B0710; /* app background            */
+  --color-surface:     #14101C; /* panels / cards            */
+  --color-surface-2:   #1B1526; /* raised cards              */
+  --color-floor:       #0C0913; /* empty grid cell           */
+
+  /* ---- Neon accents (shared chroma, hue-varied) ---- */
+  --color-magenta:     #FF2E97; /* primary action, cat       */
+  --color-magenta-soft:#FF6FB8; /* magenta text/labels       */
+  --color-cyan:        #21E6FF; /* secondary action, mouse   */
+  --color-cyan-soft:   #7DEEFF; /* cyan text/labels          */
+  --color-gold:        #FFD23F; /* hi-score, cheese, rank    */
+
+  /* ---- Text ---- */
+  --color-ink:         #F4EEFF; /* primary text              */
+  --color-muted:       #9387B0; /* secondary text            */
+  --color-muted-2:     #6B6480; /* tertiary / hints          */
+
+  /* ---- Grid entities ---- */
+  --color-wall:        #19222E; /* fixed wall fill           */
+  --color-wall-edge:   #283747; /* wall inner border         */
+  --color-block-top:   #352B50; /* movable block highlight   */
+  --color-block-bottom:#241C37; /* movable block base        */
+
+  /* ---- Radius ---- */
+  --radius-tile:    3px;
+  --radius-chip:    13px;
+  --radius-card:    22px;
+  --radius-screen-modern: 46px;
+  --radius-screen-arcade: 28px;
+  --radius-pill:    999px;
+
+  /* ---- Neon glow shadows ---- */
+  --shadow-glow-mg:      0 0 32px -4px rgba(255,46,151,.90);
+  --shadow-glow-mg-soft: 0 0 22px -6px rgba(255,46,151,.60);
+  --shadow-glow-cy:      0 0 34px -8px rgba(33,230,255,.55);
+  --shadow-glow-cy-soft: 0 0 22px -8px rgba(33,230,255,.80);
+  --shadow-glow-gold:    0 0 9px  1px rgba(255,210,63,.60);
+  --shadow-tile-mouse:   0 0 9px  1px rgba(33,230,255,.85), inset 0 0 0 1px rgba(255,255,255,.6);
+  --shadow-tile-cat:     0 0 9px  1px rgba(255,46,151,.85), inset 0 0 0 1px rgba(255,255,255,.4);
+  --shadow-tile-cheese:  0 0 9px  1px rgba(255,210,63,.70), inset 0 0 0 1px rgba(255,255,255,.5);
+  --shadow-tile-block:   inset 0 1px 0 rgba(255,255,255,.07), inset 0 0 0 1px rgba(120,95,180,.20);
+  --shadow-tile-wall:    inset 0 0 0 1px #283747;
+  --shadow-sheet:        0 -10px 50px -20px rgba(0,0,0,.80);
+}
+
+/* 20-wide grid template (not a Tailwind default).
+   Use class `grid-cols-board`, or the arbitrary value
+   grid-cols-[repeat(20,minmax(0,1fr))]. */
+@layer utilities {
+  .grid-cols-board { grid-template-columns: repeat(20, minmax(0, 1fr)); }
+  .grid-rows-board { grid-template-rows:    repeat(20, minmax(0, 1fr)); }
+
+  /* Chromatic title shadow (Flow A / arcade) */
+  .text-chromatic {
+    text-shadow: 3px 3px 0 var(--color-magenta), 6px 6px 0 rgba(33,230,255,.45);
+  }
+  /* Soft neon glow on text */
+  .text-glow-cy { text-shadow: 0 0 12px rgba(33,230,255,.70); }
+  .text-glow-mg { text-shadow: 0 0 26px rgba(255,46,151,.70); }
+
+  /* CRT scanline overlay — drop as an absolutely-positioned child */
+  .scanlines {
+    background: repeating-linear-gradient(0deg, transparent 0 2px, rgba(0,0,0,.16) 2px 3px);
+    mix-blend-mode: overlay;
+    pointer-events: none;
+  }
+}
+
+@keyframes vv-pulse { 0%,100% { opacity:.5 } 50% { opacity:1 } }
+.animate-vv-pulse { animation: vv-pulse 1.6s ease-in-out infinite; }
